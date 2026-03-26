@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>積読 — 積読管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;700&family=Shippori+Mincho:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   CSS VARIABLES
+═══════════════════════════════════════════ */
+:root {
+  --shelf-wood:      #7a5230;
+  --shelf-dark:      #5c3d1e;
+  --shelf-light:     #a06b3c;
+  --shelf-edge:      #3d2510;
+  --room-bg-top:     #1a1008;
+  --room-bg-mid:     #2e1c0a;
+  --room-bg-low:     #3d2510;
+
+  --col-w:   240px;
+  --col-gap:  28px;
+
+  --ink-white:  rgba(255,255,255,.92);
+  --ink-dim:    rgba(255,255,255,.60);
+  --ink-faint:  rgba(255,255,255,.35);
+
+  --modal-bg:   #fdf8f0;
+  --modal-ink:  #2c2416;
+  --modal-muted:#7a6e5f;
+  --modal-faint:#b5a99a;
+  --modal-rule: #e0d8cc;
+  --modal-sage: #6b7c63;
+  --modal-terra:#9b4f3a;
+  --modal-terra-lt:#f5e8e4;
+  --shadow-modal: 0 32px 80px rgba(0,0,0,.55), 0 4px 16px rgba(0,0,0,.3);
+}
+
+/* ═══════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Noto Serif JP', serif;
+  background: var(--room-bg-top);
+  color: #fff;
+  min-height: 100vh;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* ═══════════════════════════════════════════
+   LIBRARY ROOM BACKGROUND (CSS only)
+═══════════════════════════════════════════ */
+.room-bg {
+  position: fixed; inset: 0;
+  z-index: 0;
+  /* Deep warm gradient suggesting a dimly lit library */
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%,   #3d2a0f 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 15% 30%,  #4a300e 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 85% 30%,  #4a300e 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 50% 100%, #5c3d1e 0%, transparent 60%),
+    linear-gradient(180deg, #120b03 0%, #2a1808 30%, #3d2510 65%, #2a1808 100%);
+  overflow: hidden;
+}
+
+/* Bookshelves in background (decorative rows of blurred books) */
+.room-bg::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    /* Top shelf row */
+    repeating-linear-gradient(90deg,
+      transparent 0px, transparent 12px,
+      rgba(80,45,15,.6) 12px, rgba(80,45,15,.6) 13px
+    ),
+    /* Vertical book spines pattern */
+    repeating-linear-gradient(90deg,
+      rgba(60,35,10,.0) 0px,
+      rgba(90,55,20,.15) 6px,
+      rgba(70,42,15,.0) 14px,
+      rgba(110,65,25,.12) 20px,
+      rgba(85,50,18,.0) 28px,
+      rgba(65,38,12,.18) 34px,
+      rgba(75,45,16,.0) 40px
+    );
+  opacity: .4;
+  filter: blur(1px);
+}
+
+/* Chandelier glow from above */
+.room-bg::after {
+  content: '';
+  position: absolute;
+  top: -60px; left: 50%; transform: translateX(-50%);
+  width: 500px; height: 300px;
+  background: radial-gradient(ellipse, rgba(220,170,80,.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Side lamp glows */
+.lamp-left, .lamp-right {
+  position: fixed;
+  top: 15%; width: 260px; height: 260px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+.lamp-left  { left: -80px;  background: radial-gradient(circle, rgba(200,140,50,.14) 0%, transparent 70%); }
+.lamp-right { right: -80px; background: radial-gradient(circle, rgba(200,140,50,.14) 0%, transparent 70%); }
+
+/* ═══════════════════════════════════════════
+   TOP BAR
+═══════════════════════════════════════════ */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 50px;
+  background: linear-gradient(180deg, rgba(10,5,0,.92) 0%, rgba(20,10,3,.85) 100%);
+  border-bottom: 1px solid rgba(160,107,60,.25);
+  display: flex; align-items: center; padding: 0 32px;
+  z-index: 100;
+  gap: 14px;
+  backdrop-filter: blur(6px);
+}
+.topbar-logo {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: .15em;
+  color: #e8c97a;
+  line-height: 1;
+  text-shadow: 0 0 20px rgba(232,201,122,.4);
+}
+.topbar-sep {
+  width: 1px; height: 18px;
+  background: rgba(160,107,60,.3);
+}
+.topbar-sub {
+  font-size: 10px;
+  color: rgba(200,160,90,.5);
+  letter-spacing: .18em;
+  font-family: 'Space Mono', monospace;
+  text-transform: uppercase;
+}
+.topbar-stats {
+  margin-left: auto;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: rgba(200,170,110,.55);
+  letter-spacing: .05em;
+}
+
+/* ═══════════════════════════════════════════
+   BOARD
+═══════════════════════════════════════════ */
+.board-wrap {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-top: 50px;
+}
+
+/* The actual shelf surface at bottom */
+.shelf-surface {
+  position: relative;
+  padding: 0 32px 0;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: var(--col-gap);
+  /* Enough bottom space for shelf plank */
+  padding-bottom: 88px;
+  /* Top space so books can be tall */
+  padding-top: 40px;
+  overflow-x: auto;
+  overflow-y: visible;
+  min-height: calc(100vh - 50px);
+}
+
+/* Wooden shelf plank at the bottom */
+.shelf-plank {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 72px;
+  z-index: 10;
+  pointer-events: none;
+  background:
+    /* top highlight */
+    linear-gradient(180deg,
+      rgba(200,150,80,.6) 0px, rgba(200,150,80,.0) 4px
+    ),
+    /* Wood grain base */
+    linear-gradient(180deg,
+      #9a6535 0%, #7a4e26 18%, #6b4220 40%, #7a5230 60%, #5c3d1e 100%
+    );
+  border-top: 2px solid #b07840;
+  box-shadow:
+    0 -4px 20px rgba(0,0,0,.6),
+    inset 0 2px 4px rgba(255,200,100,.15);
+}
+
+/* Wood grain lines on plank */
+.shelf-plank::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent 60px,
+    rgba(0,0,0,.06) 60px,
+    rgba(0,0,0,.06) 61px,
+    transparent 61px,
+    transparent 90px,
+    rgba(255,255,255,.04) 90px,
+    rgba(255,255,255,.04) 91px
+  );
+}
+.shelf-plank::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg,
+    transparent, rgba(255,200,100,.25) 20%, rgba(255,200,100,.35) 50%, rgba(255,200,100,.25) 80%, transparent
+  );
+}
+
+/* ═══════════════════════════════════════════
+   COLUMN (STACK OF BOOKS)
+═══════════════════════════════════════════ */
+.column {
+  width: var(--col-w);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  position: relative;
+  animation: colIn .4s cubic-bezier(.25,.8,.25,1) both;
+}
+@keyframes colIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Column Header "Label Book" ── */
+/* The label sitting on top of the stack — like a category card */
+.col-header {
+  border-radius: 4px 4px 0 0;
+  padding: 10px 14px 9px;
+  position: relative;
+  /* Each column gets a color from JS via --col-color */
+  background: var(--col-color, #4a6741);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.18),
+    inset 0 -1px 0 rgba(0,0,0,.25),
+    2px 0 6px rgba(0,0,0,.3),
+    -2px 0 6px rgba(0,0,0,.3);
+  /* Slight texture */
+  background-image: linear-gradient(180deg,
+    rgba(255,255,255,.08) 0%, rgba(0,0,0,.08) 100%
+  );
+}
+.col-header::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 4px 4px 0 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px, transparent 3px,
+    rgba(0,0,0,.03) 3px, rgba(0,0,0,.03) 4px
+  );
+  pointer-events: none;
+}
+
+.col-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.col-title {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: .08em;
+  cursor: pointer;
+  text-shadow: 0 1px 3px rgba(0,0,0,.4);
+  border-bottom: 1px dashed rgba(255,255,255,.3);
+  padding-bottom: 1px;
+  transition: border-color .15s;
+  word-break: break-all;
+  flex: 1;
+  line-height: 1.4;
+}
+.col-title:hover { border-color: rgba(255,255,255,.7); }
+.col-title-input {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 15px;
+  font-weight: 700;
+  background: rgba(0,0,0,.25);
+  border: 1px solid rgba(255,255,255,.5);
+  border-radius: 3px;
+  color: #fff;
+  padding: 2px 7px;
+  width: 100%;
+  outline: none;
+  letter-spacing: .08em;
+}
+.col-delete-btn {
+  background: none; border: none;
+  color: rgba(255,255,255,.4);
+  cursor: pointer; font-size: 13px;
+  padding: 1px; line-height: 1;
+  transition: color .15s; flex-shrink: 0;
+}
+.col-delete-btn:hover { color: rgba(255,255,255,.9); }
+
+.col-meta {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: rgba(255,255,255,.65);
+  letter-spacing: .06em;
+  margin-bottom: 8px;
+  display: flex; gap: 6px; align-items: center;
+}
+.col-meta-sep { color: rgba(255,255,255,.25); }
+
+.col-actions {
+  display: flex; gap: 5px;
+}
+.col-btn {
+  flex: 1;
+  padding: 4px 0;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .07em;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,.3);
+  background: rgba(0,0,0,.2);
+  color: rgba(255,255,255,.88);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  text-transform: uppercase;
+}
+.col-btn:hover:not(:disabled) {
+  background: rgba(0,0,0,.35);
+  border-color: rgba(255,255,255,.65);
+}
+.col-btn:disabled { opacity: .28; cursor: default; }
+
+/* ── Book Spines Stack ── */
+.col-stack {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Empty state */
+.col-empty {
+  height: 60px;
+  background: rgba(0,0,0,.25);
+  border: 1px dashed rgba(255,255,255,.12);
+  border-top: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: rgba(255,255,255,.25);
+  font-style: italic;
+  letter-spacing: .05em;
+}
+
+/* ── Individual Book Spine ── */
+.book-card {
+  position: relative;
+  width: 100%;
+  cursor: default;
+  transition: transform .15s, filter .15s;
+  /* color set via --book-color from JS */
+  background: var(--book-color, #4a6741);
+}
+
+/* Spine texture overlay on every book */
+.book-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.09) 0%, rgba(0,0,0,.15) 100%
+  );
+  pointer-events: none;
+}
+/* Right-edge shadow (depth illusion) */
+.book-card::after {
+  content: '';
+  position: absolute; top: 0; right: 0; bottom: 0; width: 5px;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,.3));
+  pointer-events: none;
+}
+
+/* TOP book — slightly thicker / prominent */
+.book-card.is-top {
+  height: 58px;
+  border-top: 1px solid rgba(255,255,255,.18);
+  box-shadow:
+    inset 1px 0 0 rgba(255,255,255,.12),
+    2px 0 8px rgba(0,0,0,.4),
+    -1px 0 4px rgba(0,0,0,.3);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 10px;
+}
+.book-card.is-top:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.12);
+  z-index: 5;
+}
+
+/* Stacked books below — thinner */
+.book-card.is-stacked {
+  height: 36px;
+  border-top: 1px solid rgba(255,255,255,.10);
+  box-shadow:
+    inset 1px 0 0 rgba(255,255,255,.08),
+    2px 0 5px rgba(0,0,0,.35),
+    -1px 0 3px rgba(0,0,0,.25);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+  filter: brightness(.88);
+}
+.book-card.is-stacked:nth-child(3) { filter: brightness(.80); }
+.book-card.is-stacked:nth-child(4) { filter: brightness(.73); }
+.book-card.is-stacked:nth-child(n+5) { filter: brightness(.67); }
+
+/* Top card content */
+.card-title-top {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  letter-spacing: .04em;
+}
+.card-meta-top {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.card-time {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: rgba(255,255,255,.7);
+  letter-spacing: .04em;
+  background: rgba(0,0,0,.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.card-action-row {
+  display: flex; gap: 4px;
+}
+.card-link-btn, .card-peek-btn {
+  background: rgba(0,0,0,.25);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 3px;
+  color: rgba(255,255,255,.7);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 1px 4px;
+  line-height: 1.4;
+  transition: background .15s, color .15s;
+}
+.card-link-btn:hover { background: rgba(0,0,0,.4); color: #e8c97a; }
+.card-peek-btn:hover { background: rgba(0,0,0,.4); color: #a8d4a0; }
+
+.badge-important {
+  background: rgba(155,79,58,.75);
+  border: 1px solid rgba(255,150,120,.3);
+  color: #ffcbbb;
+  border-radius: 3px;
+  font-size: 9px;
+  font-family: 'Space Mono', monospace;
+  padding: 1px 5px;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+/* Stacked card content */
+.stacked-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: rgba(255,180,130,.8);
+  flex-shrink: 0;
+}
+.stacked-title {
+  font-size: 11px;
+  color: rgba(255,255,255,.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  font-family: 'Noto Serif JP', serif;
+  letter-spacing: .03em;
+}
+.stacked-time {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: rgba(255,255,255,.45);
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════
+   ADD COLUMN BUTTON
+═══════════════════════════════════════════ */
+.add-col-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 0;
+  align-self: flex-end;
+}
+.add-col-btn {
+  width: 60px;
+  height: 100px;
+  background: rgba(255,255,255,.04);
+  border: 2px dashed rgba(160,107,60,.4);
+  border-radius: 4px;
+  color: rgba(160,107,60,.55);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: border-color .2s, color .2s, background .2s;
+}
+.add-col-btn .plus-icon { font-size: 22px; line-height: 1; }
+.add-col-btn .plus-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 8px;
+  letter-spacing: .1em;
+  writing-mode: vertical-rl;
+  color: inherit;
+}
+.add-col-btn:hover {
+  border-color: rgba(200,150,70,.8);
+  color: rgba(220,170,90,.9);
+  background: rgba(180,120,40,.08);
+}
+
+/* ═══════════════════════════════════════════
+   MODALS
+═══════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10,5,0,.72);
+  backdrop-filter: blur(5px);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--modal-bg);
+  border-radius: 8px;
+  box-shadow: var(--shadow-modal);
+  padding: 28px 28px 24px;
+  width: 420px; max-width: 95vw;
+  max-height: 90vh; overflow-y: auto;
+  position: relative;
+  animation: modalIn .22s ease both;
+  border-top: 3px solid var(--modal-sage);
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(14px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-close {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none;
+  font-size: 17px; color: var(--modal-faint);
+  cursor: pointer; line-height: 1;
+  transition: color .15s;
+}
+.modal-close:hover { color: var(--modal-ink); }
+
+.modal-title {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 17px; font-weight: 600;
+  margin-bottom: 20px;
+  letter-spacing: .06em;
+  color: var(--modal-ink);
+}
+
+/* Form */
+.form-group { margin-bottom: 16px; }
+.form-label {
+  display: block;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: .1em;
+  color: var(--modal-muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.form-label .req { color: var(--modal-terra); margin-left: 2px; }
+.form-input, .form-input-url {
+  width: 100%; padding: 8px 10px;
+  font-family: 'Noto Serif JP', serif; font-size: 13px;
+  background: #f5f0e8;
+  border: 1px solid var(--modal-rule);
+  border-radius: 5px; color: var(--modal-ink);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.form-input:focus, .form-input-url:focus {
+  border-color: var(--modal-sage);
+  box-shadow: 0 0 0 3px rgba(107,124,99,.12);
+}
+.form-error {
+  font-size: 11px; color: var(--modal-terra);
+  margin-top: 4px; font-style: italic;
+  display: none;
+}
+.form-error.visible { display: block; }
+
+.form-check-row {
+  display: flex; align-items: center;
+  gap: 9px; cursor: pointer; user-select: none;
+}
+.form-checkbox {
+  width: 16px; height: 16px;
+  accent-color: var(--modal-terra);
+  cursor: pointer;
+}
+.form-check-label { font-size: 13px; color: var(--modal-ink); }
+
+.modal-actions {
+  display: flex; gap: 10px;
+  margin-top: 22px; justify-content: flex-end;
+}
+.btn-cancel {
+  padding: 8px 18px; background: none;
+  border: 1px solid var(--modal-rule);
+  border-radius: 5px;
+  font-family: 'Space Mono', monospace; font-size: 11px;
+  color: var(--modal-muted); cursor: pointer;
+  letter-spacing: .06em;
+  transition: border-color .15s, color .15s;
+}
+.btn-cancel:hover { border-color: var(--modal-muted); color: var(--modal-ink); }
+.btn-primary {
+  padding: 8px 18px; background: var(--modal-sage);
+  border: 1px solid transparent; border-radius: 5px;
+  font-family: 'Space Mono', monospace; font-size: 11px;
+  color: #fff; cursor: pointer; letter-spacing: .06em;
+  transition: background .15s;
+}
+.btn-primary:hover { background: #5a6b53; }
+.btn-danger {
+  padding: 8px 18px; background: var(--modal-terra);
+  border: 1px solid transparent; border-radius: 5px;
+  font-family: 'Space Mono', monospace; font-size: 11px;
+  color: #fff; cursor: pointer; letter-spacing: .06em;
+  transition: background .15s;
+}
+.btn-danger:hover { background: #7e3c2c; }
+
+/* Peek modal */
+.peek-field { margin-bottom: 14px; }
+.peek-label {
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  letter-spacing: .1em; color: var(--modal-faint);
+  text-transform: uppercase; margin-bottom: 4px;
+}
+.peek-value { font-size: 14px; color: var(--modal-ink); word-break: break-all; }
+.peek-value a { color: var(--modal-sage); text-decoration: underline; text-underline-offset: 2px; }
+.peek-value a:hover { color: #b08d4a; }
+.peek-badge-row { display: flex; gap: 8px; align-items: center; }
+.badge-important-modal {
+  background: var(--modal-terra-lt);
+  color: var(--modal-terra);
+  border: 1px solid rgba(155,79,58,.2);
+  border-radius: 3px; font-size: 10px;
+  font-family: 'Space Mono', monospace;
+  padding: 2px 8px; letter-spacing: .05em;
+}
+
+/* Confirm modal */
+.confirm-msg { font-size: 14px; line-height: 1.7; color: var(--modal-ink); margin-bottom: 6px; }
+.confirm-sub { font-size: 12px; color: var(--modal-muted); font-style: italic; }
+
+/* ═══════════════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════════════ */
+.shelf-surface::-webkit-scrollbar { height: 6px; }
+.shelf-surface::-webkit-scrollbar-track { background: rgba(0,0,0,.3); }
+.shelf-surface::-webkit-scrollbar-thumb { background: rgba(160,107,60,.4); border-radius: 3px; }
+.shelf-surface::-webkit-scrollbar-thumb:hover { background: rgba(160,107,60,.7); }
+</style>
+</head>
+<body>
+
+<!-- Library room background layers -->
+<div class="room-bg"></div>
+<div class="lamp-left"></div>
+<div class="lamp-right"></div>
+
+<!-- Top bar -->
+<header class="topbar">
+  <div class="topbar-logo">積読</div>
+  <div class="topbar-sep"></div>
+  <div class="topbar-sub">TSUNDOKU MANAGER</div>
+  <div class="topbar-stats" id="globalStats"></div>
+</header>
+
+<!-- Board -->
+<div class="board-wrap">
+  <div class="shelf-surface" id="board"></div>
+</div>
+
+<!-- Wooden shelf plank -->
+<div class="shelf-plank"></div>
+
+<!-- ═══ MODALS ═══ -->
+
+<!-- Push modal -->
+<div class="modal-overlay" id="pushModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="pushModalTitle">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('pushModal')" aria-label="閉じる">✕</button>
+    <div class="modal-title" id="pushModalTitle">本を積む — Push</div>
+    <div class="form-group">
+      <label class="form-label" for="pushTitle">タイトル<span class="req">*</span></label>
+      <input class="form-input" type="text" id="pushTitle" maxlength="200" placeholder="例：Clean Architecture">
+      <div class="form-error" id="pushTitleErr">タイトルを入力してください</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="pushMinutes">必要時間（分）<span class="req">*</span></label>
+      <input class="form-input" type="number" id="pushMinutes" min="0" max="99999" placeholder="例：180">
+      <div class="form-error" id="pushMinutesErr">0以上の整数を入力してください</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="pushLink">リンク（任意）</label>
+      <input class="form-input-url" type="url" id="pushLink" placeholder="https://...">
+    </div>
+    <div class="form-group">
+      <label class="form-check-row">
+        <input class="form-checkbox" type="checkbox" id="pushImportant">
+        <span class="form-check-label">重要な本としてマークする</span>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('pushModal')">キャンセル</button>
+      <button class="btn-primary" onclick="submitPush()">積む → Push</button>
+    </div>
+  </div>
+</div>
+
+<!-- Peek modal -->
+<div class="modal-overlay" id="peekModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="peekModalTitle">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('peekModal')" aria-label="閉じる">✕</button>
+    <div class="modal-title" id="peekModalTitle">一番上の本</div>
+    <div id="peekContent"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('peekModal')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pop confirm modal -->
+<div class="modal-overlay" id="popModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="popModalTitle">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('popModal')" aria-label="閉じる">✕</button>
+    <div class="modal-title" id="popModalTitle">本を取り除く — Pop</div>
+    <div class="peek-field">
+      <div class="confirm-msg" id="popConfirmMsg"></div>
+      <div class="confirm-sub">この操作は取り消せません。</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('popModal')">キャンセル</button>
+      <button class="btn-danger" onclick="confirmPop()">読了 → Pop</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Column modal -->
+<div class="modal-overlay" id="addColModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="addColModalTitle">
+  <div class="modal" style="width:340px">
+    <button class="modal-close" onclick="closeModal('addColModal')" aria-label="閉じる">✕</button>
+    <div class="modal-title" id="addColModalTitle">新しい山を追加</div>
+    <div class="form-group">
+      <label class="form-label" for="newColTitle">山の名前<span class="req">*</span></label>
+      <input class="form-input" type="text" id="newColTitle" maxlength="50" placeholder="例：技術書、小説、仕事">
+      <div class="form-error" id="newColTitleErr">名前を入力してください</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('addColModal')">キャンセル</button>
+      <button class="btn-primary" onclick="submitAddCol()">追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete col confirm -->
+<div class="modal-overlay" id="deleteColModal" style="display:none" role="dialog" aria-modal="true">
+  <div class="modal" style="width:340px">
+    <button class="modal-close" onclick="closeModal('deleteColModal')" aria-label="閉じる">✕</button>
+    <div class="modal-title">山を削除</div>
+    <div class="peek-field">
+      <div class="confirm-msg" id="deleteColMsg"></div>
+      <div class="confirm-sub">この操作は取り消せません。</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('deleteColModal')">キャンセル</button>
+      <button class="btn-danger" onclick="confirmDeleteCol()">削除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   BOOK / COLUMN COLOR PALETTES
+   Rich, varied colors to evoke real book spines
+================================================================ */
+const COL_COLORS = [
+  '#3d6b3a', // forest green
+  '#2d5a8c', // navy blue
+  '#7a4520', // burnt sienna
+  '#4a3570', // deep purple
+  '#1e5c5c', // teal
+  '#7a2d35', // burgundy
+  '#4a5c2a', // olive
+  '#5c4020', // chocolate
+];
+
+const BOOK_COLORS = [
+  '#c8e6c0', // pale green
+  '#b3cce8', // sky blue
+  '#e8c8a0', // wheat
+  '#d4b8e0', // lavender
+  '#b8dada', // pale teal
+  '#e8b8b8', // rose
+  '#d4e0a8', // sage
+  '#e0cca8', // tan
+  '#a8c8e0', // steel blue
+  '#e0b8a8', // peach
+  '#b8e0c8', // mint
+  '#c8b8e0', // periwinkle
+  '#e0d4a8', // cream
+  '#a8b8d4', // slate
+  '#e8d0b0', // buff
+  '#b0d4b8', // seafoam
+];
+
+// Deterministic color from string hash
+function colorFromId(id, palette) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
+
+/* ================================================================
+   DATA LAYER
+================================================================ */
+const STORAGE_KEY = 'tsundoku-data';
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultData();
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.stacks)) return defaultData();
+    return parsed;
+  } catch { return defaultData(); }
+}
+
+function defaultData() {
+  return {
+    stacks: [
+      {
+        id: uid(), title: '技術書',
+        books: [
+          { id: uid(), title: 'Clean Architecture',  estimatedMinutes: 300, link: '', isImportant: true,  addedAt: new Date().toISOString() },
+          { id: uid(), title: 'リーダブルコード',          estimatedMinutes: 180, link: '', isImportant: false, addedAt: new Date().toISOString() },
+          { id: uid(), title: 'プログラマー脳',            estimatedMinutes: 240, link: '', isImportant: false, addedAt: new Date().toISOString() },
+        ]
+      },
+      {
+        id: uid(), title: '小説',
+        books: [
+          { id: uid(), title: '雪国',       estimatedMinutes: 200, link: '', isImportant: false, addedAt: new Date().toISOString() },
+          { id: uid(), title: '人間失格',   estimatedMinutes: 180, link: '', isImportant: false, addedAt: new Date().toISOString() },
+        ]
+      },
+      {
+        id: uid(), title: 'ビジネス',
+        books: []
+      }
+    ]
+  };
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function uid() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+let DB = loadData();
+
+/* ================================================================
+   FORMATTING
+================================================================ */
+function fmtTime(minutes) {
+  if (!minutes || minutes < 0) return '0m';
+  const h = Math.floor(minutes / 60), m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+function totalMinutes(stack) {
+  return stack.books.reduce((s, b) => s + (b.estimatedMinutes || 0), 0);
+}
+
+/* ================================================================
+   RENDER
+================================================================ */
+function render() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  DB.stacks.forEach(stack => board.appendChild(buildColumn(stack)));
+
+  // Add column button
+  const addWrap = document.createElement('div');
+  addWrap.className = 'add-col-wrap';
+  addWrap.innerHTML = `
+    <button class="add-col-btn" onclick="openAddColModal()" aria-label="新しい山を追加">
+      <span class="plus-icon">＋</span>
+      <span class="plus-label">新しい山</span>
+    </button>`;
+  board.appendChild(addWrap);
+
+  updateGlobalStats();
+}
+
+function buildColumn(stack) {
+  const col = document.createElement('div');
+  col.className = 'column';
+  col.dataset.id = stack.id;
+
+  const isEmpty = stack.books.length === 0;
+  const total = totalMinutes(stack);
+  const colColor = colorFromId(stack.id, COL_COLORS);
+
+  col.innerHTML = `
+    <div class="col-header" style="--col-color:${colColor}">
+      <div class="col-header-top">
+        <div class="col-title" title="ダブルクリックで編集" ondblclick="startEditTitle('${stack.id}', this)">${escHtml(stack.title)}</div>
+        ${isEmpty ? `<button class="col-delete-btn" onclick="openDeleteColModal('${stack.id}')" title="山を削除">✕</button>` : ''}
+      </div>
+      <div class="col-meta">
+        <span>${stack.books.length} 冊</span>
+        <span class="col-meta-sep">·</span>
+        <span>計 ${fmtTime(total)}</span>
+      </div>
+      <div class="col-actions">
+        <button class="col-btn" onclick="openPushModal('${stack.id}')">＋ Push</button>
+        <button class="col-btn" onclick="openPeekModal('${stack.id}')" ${isEmpty ? 'disabled' : ''}>Peek</button>
+        <button class="col-btn" onclick="openPopModal('${stack.id}')"  ${isEmpty ? 'disabled' : ''}>Pop</button>
+      </div>
+    </div>
+    <div class="col-stack" id="stack-${stack.id}"></div>
+  `;
+
+  const stackEl = col.querySelector(`#stack-${stack.id}`);
+
+  if (isEmpty) {
+    stackEl.innerHTML = `<div class="col-empty">まだ本がありません</div>`;
+  } else {
+    stack.books.forEach((book, i) => {
+      stackEl.appendChild(buildBookCard(book, i === 0, stack));
+    });
+  }
+
+  return col;
+}
+
+function buildBookCard(book, isTop, stack) {
+  const card = document.createElement('div');
+  card.className = `book-card ${isTop ? 'is-top' : 'is-stacked'}`;
+  const color = colorFromId(book.id, BOOK_COLORS);
+  card.style.setProperty('--book-color', color);
+  // Make text color dark enough for the light book colors
+  card.style.color = '#1a1008';
+
+  if (isTop) {
+    card.innerHTML = `
+      <div class="card-title-top" style="color:#1a1008; text-shadow:0 1px 2px rgba(255,255,255,.3)">${escHtml(book.title)}</div>
+      <div class="card-meta-top">
+        <span class="card-time" style="background:rgba(0,0,0,.12); color:rgba(0,0,0,.65)">${fmtTime(book.estimatedMinutes)}</span>
+        <div class="card-action-row">
+          ${book.isImportant ? `<span class="badge-important" style="background:rgba(155,79,58,.18);border:1px solid rgba(155,79,58,.35);color:#7a2a14;font-size:9px;border-radius:3px;padding:1px 5px;font-family:'Space Mono',monospace">重要</span>` : ''}
+          ${book.link ? `<button class="card-link-btn" style="background:rgba(0,0,0,.1);border:1px solid rgba(0,0,0,.2);color:rgba(0,0,0,.6)" onclick="window.open('${escAttr(book.link)}','_blank')" title="リンク">🔗</button>` : ''}
+          <button class="card-peek-btn" style="background:rgba(0,0,0,.1);border:1px solid rgba(0,0,0,.2);color:rgba(0,0,0,.6)" onclick="openPeekModal('${stack.id}')" title="詳細">👁</button>
+        </div>
+      </div>`;
+  } else {
+    card.innerHTML = `
+      ${book.isImportant ? `<div class="stacked-dot" style="background:rgba(155,79,58,.7)"></div>` : ''}
+      <div class="stacked-title" style="color:rgba(0,0,0,.7)">${escHtml(book.title)}</div>
+      <div class="stacked-time" style="color:rgba(0,0,0,.45)">${fmtTime(book.estimatedMinutes)}</div>`;
+  }
+  return card;
+}
+
+function updateGlobalStats() {
+  let totalBooks = 0, totalMins = 0;
+  DB.stacks.forEach(s => { totalBooks += s.books.length; totalMins += totalMinutes(s); });
+  document.getElementById('globalStats').textContent =
+    `${DB.stacks.length} 山 · 計 ${totalBooks} 冊 · ${fmtTime(totalMins)}`;
+}
+
+/* ================================================================
+   INLINE TITLE EDIT
+================================================================ */
+function startEditTitle(stackId, el) {
+  const stack = DB.stacks.find(s => s.id === stackId);
+  if (!stack) return;
+  const input = document.createElement('input');
+  input.className = 'col-title-input';
+  input.value = stack.title;
+  input.maxLength = 50;
+  el.replaceWith(input);
+  input.focus(); input.select();
+  const commit = () => {
+    const val = input.value.trim();
+    if (val) { stack.title = val; saveData(DB); }
+    render();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') render();
+  });
+}
+
+/* ================================================================
+   MODAL HELPERS
+================================================================ */
+function openModal(id) {
+  const el = document.getElementById(id);
+  el.style.display = 'flex';
+  el.addEventListener('click', function outsideClick(e) {
+    if (e.target === el) { closeModal(id); el.removeEventListener('click', outsideClick); }
+  });
+}
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+/* ================================================================
+   PUSH
+================================================================ */
+let _pushStackId = null;
+function openPushModal(stackId) {
+  _pushStackId = stackId;
+  ['pushTitle','pushMinutes','pushLink'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pushImportant').checked = false;
+  ['pushTitleErr','pushMinutesErr'].forEach(id => document.getElementById(id).classList.remove('visible'));
+  openModal('pushModal');
+  setTimeout(() => document.getElementById('pushTitle').focus(), 50);
+}
+function submitPush() {
+  const title = document.getElementById('pushTitle').value.trim();
+  const minutesRaw = document.getElementById('pushMinutes').value;
+  const link = document.getElementById('pushLink').value.trim();
+  const isImportant = document.getElementById('pushImportant').checked;
+  let valid = true;
+  if (!title) { document.getElementById('pushTitleErr').classList.add('visible'); valid = false; }
+  else document.getElementById('pushTitleErr').classList.remove('visible');
+  const minutes = parseInt(minutesRaw, 10);
+  if (minutesRaw === '' || isNaN(minutes) || minutes < 0) { document.getElementById('pushMinutesErr').classList.add('visible'); valid = false; }
+  else document.getElementById('pushMinutesErr').classList.remove('visible');
+  if (!valid) return;
+  const stack = DB.stacks.find(s => s.id === _pushStackId);
+  if (!stack) return;
+  stack.books.unshift({ id: uid(), title, estimatedMinutes: minutes, link, isImportant, addedAt: new Date().toISOString() });
+  saveData(DB); closeModal('pushModal'); render();
+}
+
+/* ================================================================
+   PEEK
+================================================================ */
+function openPeekModal(stackId) {
+  const stack = DB.stacks.find(s => s.id === stackId);
+  if (!stack || stack.books.length === 0) return;
+  const book = stack.books[0];
+  document.getElementById('peekModalTitle').textContent = `一番上の本 — ${stack.title}`;
+  document.getElementById('peekContent').innerHTML = `
+    <div class="peek-field">
+      <div class="peek-label">タイトル</div>
+      <div class="peek-value" style="font-family:'Shippori Mincho',serif;font-size:16px;font-weight:500">${escHtml(book.title)}</div>
+    </div>
+    <div class="peek-field">
+      <div class="peek-label">必要時間</div>
+      <div class="peek-value">${fmtTime(book.estimatedMinutes)}（${book.estimatedMinutes} 分）</div>
+    </div>
+    ${book.link ? `<div class="peek-field"><div class="peek-label">リンク</div><div class="peek-value"><a href="${escAttr(book.link)}" target="_blank" rel="noopener">${escHtml(book.link)}</a></div></div>` : ''}
+    <div class="peek-field">
+      <div class="peek-label">重要フラグ</div>
+      <div class="peek-badge-row">
+        ${book.isImportant ? `<span class="badge-important-modal">重要</span>` : `<span style="color:var(--modal-faint);font-size:13px">—</span>`}
+      </div>
+    </div>
+    <div class="peek-field">
+      <div class="peek-label">追加日時</div>
+      <div class="peek-value" style="font-size:12px;color:var(--modal-muted)">${new Date(book.addedAt).toLocaleString('ja-JP')}</div>
+    </div>`;
+  openModal('peekModal');
+}
+
+/* ================================================================
+   POP
+================================================================ */
+let _popStackId = null;
+function openPopModal(stackId) {
+  _popStackId = stackId;
+  const stack = DB.stacks.find(s => s.id === stackId);
+  if (!stack || stack.books.length === 0) return;
+  document.getElementById('popConfirmMsg').textContent = `「${stack.books[0].title}」を山から取り除きますか？`;
+  openModal('popModal');
+}
+function confirmPop() {
+  const stack = DB.stacks.find(s => s.id === _popStackId);
+  if (!stack) return;
+  stack.books.shift(); saveData(DB); closeModal('popModal'); render();
+}
+
+/* ================================================================
+   ADD COLUMN
+================================================================ */
+function openAddColModal() {
+  document.getElementById('newColTitle').value = '';
+  document.getElementById('newColTitleErr').classList.remove('visible');
+  openModal('addColModal');
+  setTimeout(() => document.getElementById('newColTitle').focus(), 50);
+}
+function submitAddCol() {
+  const title = document.getElementById('newColTitle').value.trim();
+  if (!title) { document.getElementById('newColTitleErr').classList.add('visible'); return; }
+  DB.stacks.push({ id: uid(), title, books: [] });
+  saveData(DB); closeModal('addColModal'); render();
+  setTimeout(() => {
+    const board = document.getElementById('board');
+    board.scrollTo({ left: board.scrollWidth, behavior: 'smooth' });
+  }, 100);
+}
+
+/* ================================================================
+   DELETE COLUMN
+================================================================ */
+let _deleteColId = null;
+function openDeleteColModal(stackId) {
+  _deleteColId = stackId;
+  const stack = DB.stacks.find(s => s.id === stackId);
+  if (!stack) return;
+  document.getElementById('deleteColMsg').textContent = `「${stack.title}」を削除しますか？`;
+  openModal('deleteColModal');
+}
+function confirmDeleteCol() {
+  DB.stacks = DB.stacks.filter(s => s.id !== _deleteColId);
+  saveData(DB); closeModal('deleteColModal'); render();
+}
+
+/* ================================================================
+   ESCAPE HELPERS
+================================================================ */
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function escAttr(str) { return escHtml(str); }
+
+/* ================================================================
+   KEYBOARD
+================================================================ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    ['pushModal','peekModal','popModal','addColModal','deleteColModal'].forEach(id => {
+      if (document.getElementById(id).style.display !== 'none') closeModal(id);
+    });
+  }
+  if (e.key === 'Enter' && document.getElementById('pushModal').style.display !== 'none' && document.activeElement.tagName !== 'BUTTON') submitPush();
+  if (e.key === 'Enter' && document.getElementById('addColModal').style.display !== 'none' && document.activeElement.tagName !== 'BUTTON') submitAddCol();
+});
+
+/* ================================================================
+   INIT
+================================================================ */
+render();
+</script>
+</body>
+</html>
